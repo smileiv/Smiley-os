@@ -1,20 +1,12 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "smiley-proxy",
-  "compatibility_date": "2026-05-22",
-  "observability": {
-    "enabled": true
-  },
-  "assets": {
-    "directory": "."
-  },
-  "compatibility_flags": [
-    "nodejs_compat"
+  "main": "worker.js",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [
+    {
+      "binding": "CONCIERGE_TICKETS",
+      "id": "607cf97261864144b0c94699135f5302"
+    }
   ]
 }
-[vars]
-# Other vars...
-
-[[kv_namespaces]]
-binding = "CONCIERGE_TICKETS"
-id = "607cf97261864144b0c94699135f5302"
