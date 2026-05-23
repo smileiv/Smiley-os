@@ -12,3 +12,9 @@
     "nodejs_compat"
   ]
 }
+[vars]
+# Other vars...
+
+[[kv_namespaces]]
+binding = "CONCIERGE_TICKETS"
+id = "<YOUR_KV_ID>"
