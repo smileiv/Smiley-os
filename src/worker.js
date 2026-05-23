@@ -1,10 +1,9 @@
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const kv = env.CONCIERGE_TICKETS; // Bind this in wrangler.toml/jsonc
     const origin = request.headers.get("origin") || "*";
 
-    // CORS preflight
+    // 1. CORS Preflight (Handles ALL routes)
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
@@ -16,19 +15,19 @@ export default {
       });
     }
 
-    // POST /api/ticket  (Web or SMS)
+    // ==========================================
+    // MODULE A: CONCIERGE TICKETING SYSTEM
+    // ==========================================
+    const kv = env.CONCIERGE_TICKETS;
+
+    // POST /api/ticket (Web or SMS)
     if (request.method === "POST" && url.pathname === "/api/ticket") {
       const data = await request.json();
-      // Example {text, phone, fileUrl, fromSms}
       const id = Date.now().toString() + Math.random().toString(16).slice(2);
       await kv.put(id, JSON.stringify({ ...data, id, status: "open", date: new Date().toISOString() }));
 
-      // TODO: Add call to sendNotification (email, push, sms)
       return new Response(JSON.stringify({ ok: true, id }), {
-        headers: {
-          "Access-Control-Allow-Origin": origin,
-          "Content-Type": "application/json"
-        }
+        headers: { "Access-Control-Allow-Origin": origin, "Content-Type": "application/json" }
       });
     }
 
@@ -36,20 +35,18 @@ export default {
     if (request.method === "GET" && url.pathname === "/api/tickets") {
       const list = await kv.list();
       const tickets = [];
-      for (const key of list.keys)
-        tickets.push(JSON.parse(await kv.get(key.name)));
+      for (const key of list.keys) {
+        const item = await kv.get(key.name);
+        if (item) tickets.push(JSON.parse(item));
+      }
       tickets.sort((a, b) => b.date.localeCompare(a.date)); // Latest first
       return new Response(JSON.stringify(tickets), {
-        headers: {
-          "Access-Control-Allow-Origin": origin,
-          "Content-Type": "application/json"
-        }
+        headers: { "Access-Control-Allow-Origin": origin, "Content-Type": "application/json" }
       });
     }
 
-    // POST /api/sms (webhook for SMS-in via Verizon/post)
+    // POST /api/sms (Webhook for SMS-in via Verizon/post)
     if (request.method === "POST" && url.pathname === "/api/sms") {
-      // Body parsing (adjust key based on Verizon payload)
       const sms = await request.json();
       const text = sms.text || sms.Body || sms.message || "No message";
       const phone = sms.from || sms.From || sms.phoneNumber || "Unknown";
@@ -57,11 +54,61 @@ export default {
       const id = Date.now().toString() + Math.random().toString(16).slice(2);
       await kv.put(id, JSON.stringify({ ...ticket, id, status: "open", date: new Date().toISOString() }));
 
-      // TODO: Add call to sendNotification
       return new Response("ok", { headers: { "Access-Control-Allow-Origin": origin } });
     }
 
-    // 404 fallback
-    return new Response("Not found", { status: 404, headers: { "Access-Control-Allow-Origin": origin } });
+    // ==========================================
+    // MODULE B: SMILEY AI PROXY ROUTER
+    // ==========================================
+    // Catching the root "/" for the Smiley OS frontend AI calls
+    if (request.method === "POST" && url.pathname === "/") {
+      try {
+        const body = await request.json();
+        const modelName = body.modelName;
+
+        if (!modelName) {
+          return new Response(JSON.stringify({ error: "modelName is required" }), {
+            status: 400,
+            headers: { "Access-Control-Allow-Origin": origin, "Content-Type": "application/json" }
+          });
+        }
+
+        const isCloudflareModel = modelName.startsWith("@cf/");
+        let data;
+
+        if (isCloudflareModel) {
+          // Workers AI Engine
+          data = await env.AI.run(modelName, { messages: body.messages });
+        } else {
+          // Google Gemini Engine
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${env.GEMINI_API_KEY}`;
+          const response = await fetch(geminiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body.geminiPayload)
+          });
+          data = await response.json();
+        }
+
+        return new Response(JSON.stringify(data), {
+          headers: { "Access-Control-Allow-Origin": origin, "Content-Type": "application/json" }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Access-Control-Allow-Origin": origin, "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    // ==========================================
+    // FALLBACK
+    // ==========================================
+    return new Response("Not found", { 
+      status: 404, 
+      headers: { "Access-Control-Allow-Origin": origin } 
+    });
   }
 }
+
+```
