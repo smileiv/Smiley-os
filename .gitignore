@@ -4,3 +4,19 @@
 !.dev.vars.example
 .env*
 !.env.example
+
+# Build artifacts & runtime
+node_modules/
+public/
+*.log
+*.pid
+.pids
+
+# Frontend build artifacts (keep source)
+smiley-os-frontend/node_modules/
+smiley-os-frontend/dist/
+smiley-os-frontend/server.pid
+smiley-os-frontend/server.log
+
+# mesh proxy scratch
+mesh-llm-proxy/
