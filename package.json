@@ -4,6 +4,7 @@
   "description": "Smiley OS — self-hosted AI concierge",
   "main": "server.js",
   "scripts": {
+    "postinstall": "cd smiley-os-frontend && npm install && npm run build && cd .. && mkdir -p public && cp -r smiley-os-frontend/dist/* ./public/",
     "build": "cd smiley-os-frontend && npm install && npm run build && cd .. && mkdir -p public && cp -r smiley-os-frontend/dist/* ./public/",
     "start": "node server.js",
     "dev": "nodemon server.js"
