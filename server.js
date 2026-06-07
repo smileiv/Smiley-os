@@ -9,6 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+console.log('Static files serving from:', path.join(__dirname, 'public'));
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -112,7 +113,9 @@ app.post('/api/acp-proxy', async (req, res) => {
 
 // SPA fallback
 app.use((req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    const indexPath = path.join(__dirname, 'public', 'index.html');
+    console.log('Serving index from:', indexPath);
+    res.sendFile(indexPath);
 });
 
 app.use((err, req, res, next) => {
