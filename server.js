@@ -14,6 +14,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Configuration
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const ALLOWED_GEMINI_MODELS = new Set([
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash-exp'
+]);
 
 if (!GEMINI_API_KEY) {
     console.error('❌ ERROR: GEMINI_API_KEY not set in .env file');
@@ -36,8 +41,15 @@ app.post('/api/proxy', async (req, res) => {
         });
     }
 
+    if (typeof modelName !== 'string' || !ALLOWED_GEMINI_MODELS.has(modelName)) {
+        return res.status(400).json({
+            error: { message: 'Invalid modelName' }
+        });
+    }
+
     try {
-        const url = `${GEMINI_API_URL}/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+        const safeModelName = encodeURIComponent(modelName);
+        const url = `${GEMINI_API_URL}/${safeModelName}:generateContent?key=${GEMINI_API_KEY}`;
 
         console.log(`📤 Calling Gemini ${modelName}...`);
 
