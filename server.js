@@ -8,11 +8,31 @@ const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+const fs = require('fs');
+
+// ... (existing middleware)
+
+// Debug: Check public folder contents
+try {
+    const pubDir = path.join(__dirname, 'public');
+    if (fs.existsSync(pubDir)) {
+        console.log('Contents of public/ folder:', fs.readdirSync(pubDir));
+    } else {
+        console.log('Public folder does not exist!');
+    }
+} catch(e) { console.error('Error reading public dir:', e); }
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const MESH_LLM_URL = process.env.MESH_LLM_URL || 'http://localhost:9337';
+const ALLOWED_ACP_AGENT_HOSTS = new Set(
+    (process.env.ALLOWED_ACP_AGENT_HOSTS || 'localhost,127.0.0.1')
+        .split(',')
+        .map(host => host.trim().toLowerCase())
+        .filter(Boolean)
+);
 
 const ALLOWED_GEMINI_MODELS = new Set([
     'gemini-1.5-flash',
@@ -25,6 +45,16 @@ const ALLOWED_GEMINI_MODELS = new Set([
 if (!GEMINI_API_KEY) {
     console.error('❌ ERROR: GEMINI_API_KEY not set in .env file');
     process.exit(1);
+}
+
+function isAllowedAgentUrl(agentUrl) {
+    try {
+        const parsed = new URL(agentUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+        return ALLOWED_ACP_AGENT_HOSTS.has(parsed.hostname.toLowerCase());
+    } catch (e) {
+        return false;
+    }
 }
 
 // Health check
@@ -80,6 +110,9 @@ app.post('/api/mesh', async (req, res) => {
 app.post('/api/acp-proxy', async (req, res) => {
     const { agentUrl, ...payload } = req.body;
     if (!agentUrl) return res.status(400).json({ error: 'Missing agentUrl' });
+    if (!isAllowedAgentUrl(agentUrl)) {
+        return res.status(400).json({ error: 'Invalid or disallowed agentUrl' });
+    }
     try {
         const response = await axios.post(agentUrl, payload, {
             timeout: 120000,
@@ -93,7 +126,9 @@ app.post('/api/acp-proxy', async (req, res) => {
 
 // SPA fallback
 app.use((req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    const indexPath = path.join(__dirname, 'public', 'index.html');
+    console.log('Serving index from:', indexPath);
+    res.sendFile(indexPath);
 });
 
 app.use((err, req, res, next) => {
