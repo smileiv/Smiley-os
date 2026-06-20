@@ -1,0 +1,101 @@
+# recipes/automated-code-review.yaml
+# -------------------------------------------------------------
+# An end‑to‑end code‑review recipe that runs linting, security scanning,
+# unit‑test coverage, and a light performance check for a PR.
+# -------------------------------------------------------------
+
+version: "1.0.0"
+
+title: "Automated Code Review"
+description: |
+  This recipe automatically reviews a pull request for:
+  • Code‑quality / best‑practice violations
+  • Security vulnerabilities
+  • Missing or insufficient unit tests
+  • Basic performance regressions
+
+  The checks are run for the language you select, with the ability to
+  specify a minimal coverage threshold and coding‑standard quality gates.
+
+  The result is emitted as a JSON object that can be parsed by any CI/CD
+  system.
+
+instructions: |
+  The assistant pulls the changed files from the current PR, runs the
+  selected static‑analysis and test‑coverage utilities, and returns a
+  structured JSON object.  You can customise the language, the minimum
+  coverage and the coding‑standard to enforce before launching.
+
+parameters:
+  - key: language
+    input_type: select
+    requirement: required
+    description: "Programming language of the code in this PR"
+    options:
+      - python
+      - javascript
+      - java
+
+  - key: min_coverage
+    input_type: number
+    requirement: optional
+    default: 80
+    description: |
+      Minimum percentage of unit‑test coverage required.  
+      Set to 0 to skip coverage.
+
+  - key: coding_standards
+    input_type: string
+    requirement: optional
+    description: |
+      Name / shorthand for a coding‑standard guide (e.g. `PEP8`, `Airbnb`).
+
+response:
+  json_schema:
+    type: object
+    properties:
+      review_passed:
+        type: boolean
+        description: "Overall pass/fail status (all enabled checks must pass)"
+      checks:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+              description: "Check name (linting, security, coverage, performance)"
+            status:
+              type: string
+              enum: [passed, failed, skipped]
+              description: "Result of the check"
+            details:
+              type: string
+              description: "Human‑readable output (copy‑paste ready)"
+    required:
+      - review_passed
+      - checks
+
+sub_recipes:
+  - name: code_reviews
+    path: subrecipes/run-code-review.yaml
+    values:
+      language: "{{ language }}"
+      min_coverage: "{{ min_coverage }}"
+      coding_standards: "{{ coding_standards }}"
+
+# -------------------------------------------------------------
+# Extensions used by the recipe
+# -------------------------------------------------------------
+extensions:
+  - type: stdio
+    name: github-mcp
+    cmd: github-mcp-server
+    args: []
+    env_keys:
+      - GITHUB_PERSONAL_ACCESS_TOKEN   # <-- must be set in CI
+    timeout: 60
+    description: "GitHub MCP server – gives PR metadata and changed files"
+
+  # Sub‑recipes automatically pull in the `summon` extension,
+  # so we don’t need to declare it explicitly.

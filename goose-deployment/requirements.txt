@@ -1,0 +1,7 @@
+torch==2.12.1
+torchtext==0.17.0
+tqdm
+flake8
+bandit
+pytest
+pytest-cov

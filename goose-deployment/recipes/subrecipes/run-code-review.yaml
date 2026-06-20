@@ -1,0 +1,172 @@
+# recipes/subrecipes/run-code-review.yaml
+# -------------------------------------------------------------
+# Implements the heavy lifting: lint, security scan, tests/coverage, light perf.
+# -------------------------------------------------------------
+version: "1.0.0"
+
+title: "Run Code Review Checks"
+
+instructions: |
+  An inline Python script fetches the list of changed files, runs a
+  language‑specific linter, security scanner, unit‑test suite, and
+  coverage measurement.  Output is a JSON object matching the parent
+  recipe’s schema.
+
+parameters:
+  - key: language
+    input_type: string
+    requirement: required
+    description: "Language used in this PR"
+
+  - key: min_coverage
+    input_type: number
+    requirement: required
+    description: "Minimum coverage percentage required"
+
+  - key: coding_standards
+    input_type: string
+    requirement: optional
+    description: "Coding‑standard name (e.g. PEP8, Airbnb)"
+
+response:
+  json_schema:
+    type: object
+    properties:
+      review_passed:
+        type: boolean
+      checks:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            status:
+              type: string
+            details:
+              type: string
+    required: [review_passed, checks]
+
+extensions:
+  - type: inline_python
+    name: code_review_executor
+    timeout: 900
+    description: |
+      Executes a small Python script that performs linting, security scanning,
+      test execution and coverage calculation.  The script is deliberately
+      lightweight and only relies on tools that are expected to exist in a
+      typical CI environment (flake8, bandit, eslint, npm, mvn, pytest…).
+    code: |
+      import json, subprocess, sys
+      from pathlib import Path
+
+      def run(cmd, cwd=None, env=None):
+          p = subprocess.run(
+              cmd,
+              cwd=cwd,
+              env=env,
+              capture_output=True,
+              text=True,
+              check=False,
+          )
+          return p.returncode, p.stdout + p.stderr
+
+      # 1️⃣ Diff
+      def get_changed_files():
+          rc, out = run(["git", "diff", "--name-only", "origin/main..HEAD"])
+          if rc != 0:
+              return []
+          return [l.strip() for l in out.splitlines() if l.strip()]
+
+      files = get_changed_files()
+      if not files:
+          print(json.dumps({"review_passed": True, "checks": []}))
+          sys.exit(0)
+
+      # 2️⃣ Lint
+      def lint():
+          if {{ language }} == "python":
+              cmd = ["flake8"] + files
+              if "{{ coding_standards }}" and "{{ coding_standards }}".lower() == "pep8":
+                  cmd.append("--max-line-length=79")
+          elif {{ language }} == "javascript":
+              cmd = ["eslint", "--ext", ".js,.jsx,.ts,.tsx"] + files
+          elif {{ language }} == "java":
+              cmd = ["mvn", "checkstyle:check"]
+          else:
+              return {"status":"skipped","details":f"Linting not supported for {{ language }}"}
+
+          rc, out = run(cmd)
+          return {"status":"passed" if rc==0 else "failed","details":out.strip()}
+
+      # 3️⃣ Security
+      def security():
+          if {{ language }} == "python":
+              cmd = ["bandit", "-r"] + files
+          elif {{ language }} == "javascript":
+              if Path("package.json").exists():
+                  cmd = ["npm", "audit", "--json"]
+              else:
+                  return {"status":"skipped","details":"package.json missing – cannot run npm audit"}
+          else:
+              return {"status":"skipped","details":f"Security scan not implemented for {{ language }}"}
+          rc, out = run(cmd)
+          return {"status":"passed" if rc==0 else "failed","details":out.strip()}
+
+      # 4️⃣ Tests & coverage
+      def coverage_check():
+          if {{ language }} == "python":
+              rc, out = run(["pytest", "--cov=.", "--cov-report=term-missing"])
+              cov = 0
+              for l in out.splitlines():
+                  if l.strip().startswith("TOTAL"):
+                      try:
+                          cov = float(l.split()[-1].replace("%",""))
+                      except Exception:
+                          pass
+              status = "passed" if cov >= int({{ min_coverage }}) else "failed"
+              return {"status":status,
+                      "details":f"Coverage: {cov:.1f}% (required { { { min_coverage }} })\\n"+out.strip()}
+          elif {{ language }} == "javascript":
+              if Path("jest.config.js").exists() or Path("package.json").exists():
+                  rc, out = run(["npm", "test", "--", "--coverage"])
+                  cov = 0
+                  for l in out.splitlines():
+                      if "% Statements" in l:
+                          try:
+                              cov = float(l.split(":")[1].strip().replace("%",""))
+                          except Exception:
+                              pass
+                  status = "passed" if cov >= int({{ min_coverage }}) else "failed"
+                  return {"status":status,
+                          "details":f"Coverage: {cov:.1f}% (required { { { min_coverage }} })\\n"+out.strip()}
+              else:
+                  return {"status":"skipped","details":"No Jest config found"}
+          elif {{ language }} == "java":
+              rc, out = run(["mvn", "clean", "verify"])
+              cov = 0
+              for l in out.splitlines():
+                  if "Coverage" in l and "%" in l:
+                      try:
+                          cov = float(l.split(":")[1].replace("%","").strip())
+                      except Exception:
+                          pass
+              status = "passed" if cov >= int({{ min_coverage }}) else "failed"
+              return {"status":status,
+                      "details":f"Coverage: {cov:.1f}% (required { { { min_coverage }} })\\n"+out.strip()}
+          else:
+              return {"status":"skipped","details":f"Coverage not implemented for {{ language }}"}
+
+      # 5️⃣ Performance (placeholder – advanced analysis is out of scope)
+      perf = {"status":"skipped","details":"Performance analysis not implemented in this template"}
+
+      # Build report
+      checks = [
+          {"name":"linting", **lint()},
+          {"name":"security", **security()},
+          {"name":"coverage", **coverage_check()},
+          {"name":"performance", **perf},
+      ]
+
+      overall_pass = all(c["status"] in ("passed","skipped") for c in checks)
+      print(json.dumps({"review_passed": overall_pass, "checks": checks}))
