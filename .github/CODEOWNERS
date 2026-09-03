@@ -1,0 +1,10 @@
+# Default ownership
+* @smileiv
+
+# Area ownership
+/apps/ @smileiv
+/services/ @smileiv
+/libs/ @smileiv
+/infra/ @smileiv
+/docs/ @smileiv
+/scripts/ @smileiv
