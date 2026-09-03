@@ -17,7 +17,7 @@ RST='\033[0m'
 # ── Paths ──────────────────────────────────────────────────────────────────────
 SMILEY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND_DIR="${SMILEY_DIR}/smiley-os-frontend"
-ACP_DIR="/Users/administrator/claude-agent-acp/claude-agent-acp-main"
+ACP_DIR="${ACP_DIR:-../claude-agent-acp}"
 PIDS_FILE="${SMILEY_DIR}/.pids"
 LOG_DIR="${SMILEY_DIR}"
 

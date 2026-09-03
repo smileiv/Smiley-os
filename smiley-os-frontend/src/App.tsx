@@ -16,9 +16,11 @@ import { Turnstile } from '@marsidev/react-turnstile';
 import AcpPanel from './AcpPanel';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const PROXY_URL   = 'http://localhost:3000/api/proxy';
-const MESH_URL    = 'http://localhost:3000/api/mesh';
-const ACP_URL     = 'http://localhost:3000/api/acp-proxy';
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE = isLocal ? 'http://localhost:3000' : '';
+const PROXY_URL   = `${API_BASE}/api/proxy`;
+const MESH_URL    = `${API_BASE}/api/mesh`;
+const ACP_URL     = `${API_BASE}/api/acp-proxy`;
 const TURNSTILE_SITEKEY = '0x4AAAAAADYJS9akmMBIzl-z';
 
 type Role = 'user' | 'model';
