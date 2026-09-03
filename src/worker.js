@@ -16,49 +16,7 @@ export default {
     }
 
     // ==========================================
-    // MODULE A: CONCIERGE TICKETING SYSTEM
-    // ==========================================
-    const kv = env.CONCIERGE_TICKETS;
-
-    // POST /api/ticket (Web or SMS)
-    if (request.method === "POST" && url.pathname === "/api/ticket") {
-      const data = await request.json();
-      const id = Date.now().toString() + Math.random().toString(16).slice(2);
-      await kv.put(id, JSON.stringify({ ...data, id, status: "open", date: new Date().toISOString() }));
-
-      return new Response(JSON.stringify({ ok: true, id }), {
-        headers: { "Access-Control-Allow-Origin": origin, "Content-Type": "application/json" }
-      });
-    }
-
-    // GET /api/tickets
-    if (request.method === "GET" && url.pathname === "/api/tickets") {
-      const list = await kv.list();
-      const tickets = [];
-      for (const key of list.keys) {
-        const item = await kv.get(key.name);
-        if (item) tickets.push(JSON.parse(item));
-      }
-      tickets.sort((a, b) => b.date.localeCompare(a.date)); // Latest first
-      return new Response(JSON.stringify(tickets), {
-        headers: { "Access-Control-Allow-Origin": origin, "Content-Type": "application/json" }
-      });
-    }
-
-    // POST /api/sms (Webhook for SMS-in via Verizon/post)
-    if (request.method === "POST" && url.pathname === "/api/sms") {
-      const sms = await request.json();
-      const text = sms.text || sms.Body || sms.message || "No message";
-      const phone = sms.from || sms.From || sms.phoneNumber || "Unknown";
-      const ticket = { text, phone, fromSms: true };
-      const id = Date.now().toString() + Math.random().toString(16).slice(2);
-      await kv.put(id, JSON.stringify({ ...ticket, id, status: "open", date: new Date().toISOString() }));
-
-      return new Response("ok", { headers: { "Access-Control-Allow-Origin": origin } });
-    }
-
-    // ==========================================
-    // MODULE B: SMILEY AI PROXY ROUTER
+    // MODULE A: SMILEY AI PROXY ROUTER
     // ==========================================
     // Catching the root "/" for the Smiley OS frontend AI calls
     if (request.method === "POST" && url.pathname === "/") {
@@ -110,5 +68,3 @@ export default {
     });
   }
 }
-
-```
