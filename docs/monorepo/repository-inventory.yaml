@@ -1,0 +1,44 @@
+destination_repo: smileiv/Smiley-os
+history_policy: preserve_full_history
+organization_model:
+  top_level_folders:
+    - apps
+    - services
+    - libs
+    - infra
+    - docs
+    - scripts
+  naming:
+    folders: kebab-case
+    workflows: "<area>-<purpose>"
+repositories:
+  - name: Smiley-os
+    full_name: smileiv/Smiley-os
+    include: true
+    target_path: apps/smiley-os
+    language: [JavaScript, TypeScript, Python, HTML]
+    build_commands:
+      backend: npm --prefix . run start
+      frontend: npm --prefix smiley-os-frontend run build
+    lint_commands:
+      frontend: npm --prefix smiley-os-frontend run lint
+    test_commands:
+      backend: "N/A (no test script yet)"
+      frontend: "N/A (no test script yet)"
+    ci:
+      github_actions: pending_setup
+    dependencies:
+      manager: npm,pip
+      policy: pin critical runtime dependencies and keep lockfiles committed
+    secrets:
+      source: environment_variables
+      required:
+        - GEMINI_API_KEY
+        - ANTHROPIC_API_KEY
+    owners:
+      - "@smileiv"
+    migration_status: in_destination
+migration_waves:
+  - id: wave-1
+    description: baseline monorepo governance and migration tooling
+    status: complete
